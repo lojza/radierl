@@ -42,7 +42,7 @@
 -author('vances@motivity.ca').
 
 %% export the radius_attributes public API
--export([new/0, store/3, fetch/2, find/2]).
+-export([new/0, store/3, store_vs/4, fetch/2, fetch_vs/3, find/2, find_vs/3]).
 -export([codec/1]).
 -export([hide/3, unhide/3]).
 
@@ -65,17 +65,32 @@ new() ->
 	Attributes :: attributes()) -> NewAttributes :: attributes().
 %% @doc Add a new attribute to a RADIUS protocol attributes list.
 %%
-store(Attribute, Value, Attributes) when is_integer(Attribute),
+store(Attribute, Value, Attributes) when is_integer(Attribute), Attribute /= ?VendorSpecific,
 		is_list(Attributes) ->
 	orddict:store(Attribute, Value, Attributes).
+
+-spec store_vs(VendorId :: pos_integer(), VsType :: pos_integer(), Value :: term(),
+	Attributes :: attributes()) -> NewAttributes :: attributes().
+%% @doc Add a new vendor specific attribute to a RADIUS protocol attributes list.
+%%
+store_vs (VendorId, VsType, Value, Attributes) when is_binary(Value)->
+	orddict:store({?VendorSpecific, VendorId, VsType}, Value, Attributes).
 
 -spec fetch(Attribute :: pos_integer(), Attributes :: attributes()) ->
 	Value :: term().
 %% @doc Returns the value for an attribute in a RADIUS protocol
 %% 	attributes list.  Assumes that the attribute is present.
 %%
-fetch(Attribute, Attributes) ->
+fetch(Attribute, Attributes) when Attribute /= ?VendorSpecific ->
 	orddict:fetch(Attribute, Attributes).
+
+-spec fetch_vs(VendorId :: pos_integer(), VsType :: pos_integer(), Attributes :: attributes()) ->
+	Value :: term().
+%% @doc Returns the value for an vendor specific attribute in a RADIUS
+%%      protocol attributes list.  Assumes that the attribute is present.
+%%
+fetch_vs(VendorId, VsType, Attributes) ->
+	orddict:fetch({?VendorSpecific, VendorId, VsType}, Attributes).
 
 -spec find(Attribute :: pos_integer(), Attributes :: attributes()) ->
 	Result :: {ok, Value :: term()} | error.
@@ -85,8 +100,20 @@ fetch(Attribute, Attributes) ->
 %% 	Value = term()
 %% @doc Searches for an attribute in a RADIUS protocol attributes list.
 %%
-find(Attribute, Attributes) ->
+find(Attribute, Attributes) when Attribute /= ?VendorSpecific ->
 	orddict:find(Attribute, Attributes).
+
+-spec find_vs(VendorId :: pos_integer(), VsType :: pos_integer(), Attributes :: attributes()) ->
+	Result :: {ok, Value :: term()} | error.
+%% 	VendorId = integer()
+%% 	VsType = integer()
+%% 	Attributes = attributes()
+%% 	Result = {ok, Value} | error
+%% 	Value = term()
+%% @doc Searches for an attribute in a RADIUS protocol attributes list.
+%%
+find_vs(VendorId, VsType, Attributes) ->
+	orddict:find({?VendorSpecific, VendorId, VsType}, Attributes).
 
 -spec codec(In :: binary() | attributes()) -> attributes() | binary().
 %% @doc Encode or decode a binary RADIUS protocol attributes field.
@@ -235,8 +262,13 @@ attribute(?Class, Value, Acc) when size(Value) >= 1 ->
 	orddict:store(?Class, Class, Acc);
 attribute(?VendorSpecific, <<0, VendorId:24, Rest/binary>>, Acc)
 		when size(Rest) >= 1 ->
-	VendorSpecific = {VendorId, Rest},
-	orddict:store(?VendorSpecific, VendorSpecific, Acc);
+	% parse vendor specific attribute
+	{TypeLen, SizeLen, HdrSize} = vsa_format(VendorId),
+	<<VsType:TypeLen, Size:SizeLen, BinValue/binary>> = Rest,
+
+	% check size
+	Size = (size(BinValue) + HdrSize),
+	orddict:store({?VendorSpecific, VendorId, VsType}, BinValue, Acc);
 attribute(?SessionTimeout, Value, Acc) when size(Value) == 4 ->
 	SessionTimeout = binary:decode_unsigned(Value),
 	orddict:store(?SessionTimeout, SessionTimeout, Acc);
@@ -288,6 +320,12 @@ attribute(?AcctInputOctets, Value, Acc) when size(Value) == 4 ->
 attribute(?AcctOutputOctets, Value, Acc) when size(Value) == 4 ->
 	AcctOutputOctets = binary:decode_unsigned(Value),
 	orddict:store(?AcctOutputOctets, AcctOutputOctets, Acc);
+attribute(?AcctInputGigaWords, Value, Acc) when size(Value) == 4 ->
+	AcctInputGigaWords = binary:decode_unsigned(Value),
+	orddict:store(?AcctInputGigaWords, AcctInputGigaWords, Acc);
+attribute(?AcctOutputGigaWords, Value, Acc) when size(Value) == 4 ->
+	AcctOutputGigaWords = binary:decode_unsigned(Value),
+	orddict:store(?AcctOutputGigaWords, AcctOutputGigaWords, Acc);
 attribute(?AcctSessionId, Value, Acc) when size(Value) >= 1 ->
 	AcctSessionId = binary_to_list(Value),
 	orddict:store(?AcctSessionId, AcctSessionId, Acc);
@@ -402,11 +440,13 @@ attributes([{?Class, Class} | T], Acc) ->
 	CL = list_to_binary(Class),
 	Length = size(CL) + 2,
 	attributes(T, <<Acc/binary, ?Class, Length, CL/binary>>);
-attributes([{?VendorSpecific, {VendorId, Bin}} | T], Acc)
-		when is_integer(VendorId), is_binary(Bin) ->
-	Length = size(Bin) + 6,
-	attributes(T, <<Acc/binary, ?VendorSpecific, Length,
-			0, VendorId:24, Bin/binary>>);
+attributes([{{?VendorSpecific, VendorId, VsType}, BinValue} | T], Acc)
+		when is_integer(VendorId), is_integer(VsType), is_binary(BinValue) ->
+	{TypeLen, SizeLen, HdrSize} = vsa_format(VendorId),
+	Size = size(BinValue) + HdrSize,
+	VsBin = <<VsType:TypeLen, Size:SizeLen, BinValue/binary>>,
+	Length = Size + 6,
+	attributes(T, <<Acc/binary, ?VendorSpecific, Length, 0, VendorId:24, VsBin/binary>>);
 attributes([{?SessionTimeout, SessionTimeout} | T], Acc) ->
 	attributes(T, <<Acc/binary, ?SessionTimeout, 6, SessionTimeout:32>>);
 attributes([{?IdleTimeout, IdleTimeout} | T], Acc) ->
@@ -457,6 +497,10 @@ attributes([{?AcctInputOctets, AcctInputOctets} | T], Acc) ->
 	attributes(T, <<Acc/binary, ?AcctInputOctets, 6, AcctInputOctets:32>>);
 attributes([{?AcctOutputOctets, AcctOutputOctets} | T], Acc) ->
 	attributes(T, <<Acc/binary, ?AcctOutputOctets, 6, AcctOutputOctets:32>>);
+attributes([{?AcctInputGigaWords, AcctInputGigaWords} | T], Acc) ->
+	attributes(T, <<Acc/binary, ?AcctInputGigaWords, 6, AcctInputGigaWords:32>>);
+attributes([{?AcctOutputGigaWords, AcctOutputGigaWords} | T], Acc) ->
+	attributes(T, <<Acc/binary, ?AcctOutputGigaWords, 6, AcctOutputGigaWords:32>>);
 attributes([{?AcctSessionId, AcctSessionId} | T], Acc) ->
 	SI = list_to_binary(AcctSessionId),
 	Length = size(SI) + 2,
@@ -488,3 +532,17 @@ attributes([{?PortLimit, PortLimit} | T], Acc) ->
 attributes([{?LoginLatPort, LoginLatPort} | T], Acc) ->
 	attributes(T, <<Acc/binary, ?LoginLatPort, 6, LoginLatPort:32>>).
 
+% How much bites are used in the VSA attributes
+% for the type and lengt.
+% This values was taken from the Wireshark.
+% Format: {TypeLen, SizeLen, HdrSize}
+% TypeLen and SizeLen are in bites, HdrSize is in bytes.
+%
+% It is very ugly to have there hardcoded these values.
+% May be is better to have there some dictionaty for attributes and
+% formats (some text files which are compiled into erlang source).
+vsa_format (8164)-> {16,16, 4}; % Starent
+vsa_format (637) -> {16, 8, 3}; % Alcatel-ESAM
+vsa_format (54)  -> {16, 8, 3}; % DHCP
+vsa_format (4846)-> {16, 8, 3}; % Lucent
+vsa_format (_)   -> { 8, 8, 2}. % default value (accordings to RFC)

@@ -67,6 +67,8 @@
 -define(AcctTerminateCause,     49).
 -define(AcctMultiSessionId,     50).
 -define(AcctLinkCount,          51).
+-define(AcctInputGigaWords,     52).
+-define(AcctOutputGigaWords,    53).
 -define(ChapChallenge,          60).
 -define(NasPortType,            61).
 -define(PortLimit,              62).
