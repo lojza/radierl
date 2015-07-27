@@ -153,9 +153,8 @@ start(Module, Port, Address) when is_atom(Module),
 %% 	 using the callback module `Module' listening on `Port'.
 %%
 start_link(Module, Port) ->
-	{ok, Sup} = start(Module, Port),
-	link(Sup),
-	{ok, Sup}.
+	{ok, Address} = application:get_env(radius, address),
+	start_link (Module, Port, Address).
 
 -spec start_link(Module :: atom(), Port :: non_neg_integer(),
 		Address :: inet:ip_address()) ->
@@ -167,9 +166,7 @@ start_link(Module, Port) ->
 %% 	address `Address'.
 %%
 start_link(Module, Port, Address) ->
-	{ok, Sup} = start(Module, Port, Address),
-	link(Sup),
-	{ok, Sup}.
+	radius_supbr:start_link(Module, Port, Address).
 
 -spec stop(Pid :: pid()) -> ok.
 %% @doc Stop a running RADIUS protocol server.

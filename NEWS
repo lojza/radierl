@@ -1,3 +1,11 @@
+July 2015
+------------
+	- suport for vendor specific attributes
+	- Input and Output GigaWords attribites
+	- fix - missing link between server and its handlers
+	- fix - broken radius:start_link/3
+
+
 January 2014
 ------------
 	- version change to 1.0
