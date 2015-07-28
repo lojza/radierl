@@ -42,8 +42,29 @@
 
 -behaviour(supervisor).
 
+%% O & M functions
+-export([start_link/0]).
+-export([start_child/3, stop_child/1]).
+
 %% export the call back needed for supervisor behaviour
 -export([init/1]).
+
+%%----------------------------------------------------------------------
+%%  O & M functions
+%%----------------------------------------------------------------------
+
+start_link() ->
+	supervisor:start_link({local, radius}, ?MODULE, []).
+
+%%----------------------------------------------------------------------
+%%  User API functions
+%%----------------------------------------------------------------------
+
+start_child (Module, Port, Address) ->
+	supervisor:start_child(radius, [Module, Port, Address]).
+
+stop_child(Pid) ->
+	supervisor:terminate_child(radius, Pid).
 
 %%----------------------------------------------------------------------
 %%  The supervisor call back
@@ -60,7 +81,7 @@
 %%
 init(_Args) ->
 	StartMod = radius_server_sup,
-	StartFunc = {supervisor, start_link, [StartMod]},
+	StartFunc = {StartMod, start_link, []},
 	ChildSpec = {StartMod, StartFunc, temporary, infinity,
 			supervisor, [StartMod]},
 	{ok, {{simple_one_for_one, 4, 3600}, [ChildSpec]}}.

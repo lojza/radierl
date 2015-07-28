@@ -62,7 +62,7 @@
 %% @private
 %%
 start(_StartType = normal, _StartArgs) ->
-	case supervisor:start_link({local, radius}, radius_sup, []) of
+	case radius_sup:start_link() of
 		{ok, Supervisor} ->
 			{ok, Supervisor, #state{}};
 		Error ->

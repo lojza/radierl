@@ -42,8 +42,18 @@
 
 -behaviour(supervisor).
 
+%% O & M functions
+-export([start_link/3]).
+
 %% export the call back needed for supervisor behaviour
 -export([init/1]).
+
+%%----------------------------------------------------------------------
+%%  O & M functions
+%%----------------------------------------------------------------------
+
+start_link(Module, Port, Address) ->
+	supervisor:start_link(?MODULE, [Module, Port, Address]).
 
 %%----------------------------------------------------------------------
 %%  The supervisor call back

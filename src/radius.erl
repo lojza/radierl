@@ -143,7 +143,7 @@ start(Module, Port, Address) when is_list(Address) ->
 	end;
 start(Module, Port, Address) when is_atom(Module),
 		is_integer(Port), is_tuple(Address) ->
-	supervisor:start_child(radius, [[Module, Port, Address]]).
+	radius_sup:start_child (Module, Port, Address).
 
 -spec start_link(Module :: atom(), Port :: non_neg_integer()) ->
 	{ok, Pid :: pid()}
@@ -166,13 +166,13 @@ start_link(Module, Port) ->
 %% 	address `Address'.
 %%
 start_link(Module, Port, Address) ->
-	radius_supbr:start_link(Module, Port, Address).
+	radius_server_sup:start_link(Module, Port, Address).
 
 -spec stop(Pid :: pid()) -> ok.
 %% @doc Stop a running RADIUS protocol server.
 %%
 stop(Pid) ->
-	supervisor:terminate_child(whereis(radius), Pid).
+	radius_sup:stop_child(Pid).
 
 -spec codec(In :: binary() | #radius{}) -> Out :: #radius{} | binary().
 %% 	Out = radius() | binary()
