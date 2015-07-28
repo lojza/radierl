@@ -62,7 +62,7 @@
 %% export the gen_fsm state call backs
 -export([idle/2]).
 
--include("radius.hrl").
+-include_lib("radierl/include/radius.hrl").
 
 -record(statedata,
 		{socket :: inet:socket(),

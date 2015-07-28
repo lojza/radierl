@@ -109,7 +109,7 @@
 -callback terminate(Reason :: term()) -> any().
 
 %% @headerfile "radius.hrl"
--include("radius.hrl").
+-include_lib("radierl/include/radius.hrl").
 
 %%----------------------------------------------------------------------
 %%  The radius public API

@@ -47,7 +47,7 @@
 %% call backs needed for application behaviour
 -export([start/2, prep_stop/1, stop/1, config_change/3]).
 
--include("radius.hrl").
+-include_lib("radierl/include/radius.hrl").
 
 -record(state, {}).
 

@@ -47,7 +47,7 @@
 -export([hide/3, unhide/3]).
 
 %% @headerfile "radius.hrl"
--include("radius.hrl").
+-include_lib("radierl/include/radius.hrl").
 
 %%----------------------------------------------------------------------
 %%  The radius_attributes public API
