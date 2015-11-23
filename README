@@ -1,4 +1,16 @@
---=== temporary fork with a bugfix  ===--
+fork firh bugfixes and some improvements 
+   * Missing link between server and its handlers (bug - causes losts of data)
+   * Support for InputGigaWords and OutputGigaWords attributes and for vendor specific attributes.
+   * Handle error on the UDP socket.
+       When some error occurs on the UDP socket (e.g. ack is
+       send to the peer which already close its socket), runtime
+       sends a message {udp_error, Socket, Reason}.
+
+       This message must be handled (otherwise procress fails on
+       handle_info functin clause error). This is similar like
+       tcp_error message, but it is not mentioned in the documentation.
+
+
 
 %%% README
 %%%
